@@ -1,13 +1,14 @@
+import os
 import json
 from dotenv import load_dotenv
 from google import genai
 
 load_dotenv()
 
-client = genai.Client()
-
 
 def generate_ai_summary(structured_summary: dict) -> dict:
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
     prompt = f"""
 You are a data analyst. Please review this structured dataset summary and return:
 1. A plain English summary of the dataset.
