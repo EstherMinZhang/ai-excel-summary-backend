@@ -4,7 +4,7 @@ This is a backend service that accepts CSV or Excel files and returns both a str
 
 ## Project Structure
 
-- `app/main.py`: FastAPI application entry point, exposing `/` and `/summary` endpoints.
+- `app/main.py`: FastAPI application entry point, exposing `/`, `/ui`, and `/summary` endpoints.
 - `app/excel_summary.py`: Reads CSV/Excel files and produces structured summary data.
 - `app/ai_summary.py`: Calls Gemini AI (`google.genai`) to generate natural language summaries.
 - `tests/test_main.py`: API endpoint tests.
@@ -49,7 +49,11 @@ The service will be available at `http://127.0.0.1:8000`.
 
 ### `GET /`
 
-Returns a simple status message.
+Returns a simple service status message. This endpoint is mainly for quick checks in a browser, terminal, tests, or monitoring tools; it is not shown inside the upload UI.
+
+### `GET /ui`
+
+Shows a browser upload page for analyzing CSV or Excel files.
 
 ### `POST /summary`
 
@@ -63,7 +67,8 @@ curl -X POST "http://127.0.0.1:8000/summary" -F "file=@data.xlsx"
 
 ## Notes
 
-- This project does not include a custom frontend. The UI you see in the browser is FastAPI's built-in documentation interface.
+- This project includes a simple upload UI at `http://127.0.0.1:8000/ui`.
+- FastAPI's built-in API documentation is still available at `http://127.0.0.1:8000/docs`.
 - `app/excel_summary.py` extracts details such as sheet names, row counts, column counts, missing values, and data types.
 - `app/ai_summary.py` sends the structured summary to Gemini and returns the AI model response.
 
@@ -71,6 +76,14 @@ curl -X POST "http://127.0.0.1:8000/summary" -F "file=@data.xlsx"
 
 ```powershell
 pytest
+```
+
+## Continuous Integration
+
+GitHub Actions runs the CI workflow in `.github/workflows/ci.yml` on pushes to `main` and on pull requests. The workflow installs dependencies with Python 3.11 and runs:
+
+```bash
+python -m pytest
 ```
 
 ## Additional Information
