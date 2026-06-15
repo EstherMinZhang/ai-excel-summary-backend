@@ -10,6 +10,15 @@ def test_root_endpoint():
     assert response.status_code == 200
     assert response.json()["message"] == "AI Excel Summary Backend is running."
 
+
+def test_upload_ui_page():
+    response = client.get("/ui")
+
+    assert response.status_code == 200
+    assert "AI Excel Summary" in response.text
+    assert 'type="file"' in response.text
+    assert "Analyze file" in response.text
+
 # added test for the /summary endpoint with a CSV file upload
 def test_summary_endpoint_with_csv(monkeypatch):
     def fake_ai_summary(structured_summary):
