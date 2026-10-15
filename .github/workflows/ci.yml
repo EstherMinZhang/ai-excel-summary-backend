@@ -1,10 +1,13 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches:
       - main
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -26,3 +29,67 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: ai-summary-deployment
+      cancel-in-progress: false
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-2
+      AWS_PAGER: ""
+      S3_BUCKET: elasticbeanstalk-us-east-2-356065270051
+      EB_APPLICATION: ai-summary
+      EB_ENVIRONMENT: ai-summary-env
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install AWS CLI
+        run: python -m pip install awscli
+
+      - name: Package application
+        run: zip -r deployment.zip Dockerfile requirements.txt app -x "*/__pycache__/*" "*.pyc" "*/.env"
+
+      - name: Upload and deploy
+        run: |
+          VERSION="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          S3_KEY="ai-summary/${VERSION}.zip"
+
+          aws s3 cp deployment.zip "s3://${S3_BUCKET}/${S3_KEY}"
+
+          aws elasticbeanstalk create-application-version \
+            --application-name "$EB_APPLICATION" \
+            --version-label "$VERSION" \
+            --source-bundle "S3Bucket=${S3_BUCKET},S3Key=${S3_KEY}"
+
+          aws elasticbeanstalk update-environment \
+            --environment-name "$EB_ENVIRONMENT" \
+            --version-label "$VERSION"
+
+          aws elasticbeanstalk wait environment-updated \
+            --environment-names "$EB_ENVIRONMENT"
+
+          DEPLOYED_VERSION=$(aws elasticbeanstalk describe-environments \
+            --environment-names "$EB_ENVIRONMENT" \
+            --query "Environments[0].VersionLabel" \
+            --output text)
+
+          if [ "$DEPLOYED_VERSION" != "$VERSION" ]; then
+            echo "Deployment failed: the expected version is not running."
+            exit 1
+          fi
+
+          echo "Deployment completed: $VERSION"
