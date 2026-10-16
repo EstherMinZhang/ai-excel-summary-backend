@@ -63,33 +63,63 @@ jobs:
       - name: Package application
         run: zip -r deployment.zip Dockerfile requirements.txt app -x "*/__pycache__/*" "*.pyc" "*/.env"
 
-      - name: Upload and deploy
+      - name: Set deployment version
         run: |
           VERSION="github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          S3_KEY="ai-summary/${VERSION}.zip"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "S3_KEY=ai-summary/${VERSION}.zip" >> "$GITHUB_ENV"
 
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Upload deployment package to S3
+        run: |
           aws s3 cp deployment.zip "s3://${S3_BUCKET}/${S3_KEY}"
 
+      - name: Create Elastic Beanstalk application version
+        run: |
           aws elasticbeanstalk create-application-version \
             --application-name "$EB_APPLICATION" \
             --version-label "$VERSION" \
             --source-bundle "S3Bucket=${S3_BUCKET},S3Key=${S3_KEY}"
 
+      - name: Start deployment
+        run: |
           aws elasticbeanstalk update-environment \
             --environment-name "$EB_ENVIRONMENT" \
             --version-label "$VERSION"
 
+      - name: Wait for deployment
+        run: |
           aws elasticbeanstalk wait environment-updated \
             --environment-names "$EB_ENVIRONMENT"
+
+      - name: Verify deployed version
+        run: |
+          aws elasticbeanstalk describe-environments \
+            --environment-names "$EB_ENVIRONMENT" \
+            --query "Environments[0].{Status:Status,Health:Health,Version:VersionLabel}" \
+            --output table
 
           DEPLOYED_VERSION=$(aws elasticbeanstalk describe-environments \
             --environment-names "$EB_ENVIRONMENT" \
             --query "Environments[0].VersionLabel" \
             --output text)
 
+          echo "Expected version: $VERSION"
+          echo "Actual version:   $DEPLOYED_VERSION"
+
           if [ "$DEPLOYED_VERSION" != "$VERSION" ]; then
-            echo "Deployment failed: the expected version is not running."
+            echo "::error::The expected application version is not running."
             exit 1
           fi
 
-          echo "Deployment completed: $VERSION"
+      - name: Show recent Elastic Beanstalk events
+        if: always()
+        run: |
+          aws elasticbeanstalk describe-events \
+            --environment-name "$EB_ENVIRONMENT" \
+            --max-records 30 \
+            --no-paginate \
+            --query "Events[*].[EventDate,Severity,Message]" \
+            --output table
