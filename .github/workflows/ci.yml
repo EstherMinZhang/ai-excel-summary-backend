@@ -89,12 +89,6 @@ jobs:
             --version-label "$VERSION" \
             --source-bundle "S3Bucket=${S3_BUCKET},S3Key=${S3_KEY}"
 
-      - name: Check EB runtime object ACL access
-        run: |
-          aws s3api get-object-acl \
-            --bucket "$S3_BUCKET" \
-            --key "resources/environments/e-b2ncyxgcup/_runtime/_embedded_extensions/ai-summary/8a88628db0be59045abd3979c11f37dd"
-
       - name: Start deployment
         run: |
           aws elasticbeanstalk update-environment \
