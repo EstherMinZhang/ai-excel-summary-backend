@@ -84,6 +84,7 @@ jobs:
 
       - name: Create Elastic Beanstalk application version
         run: |
+          echo "Creating Elastic Beanstalk application version: $VERSION"
           aws elasticbeanstalk create-application-version \
             --application-name "$EB_APPLICATION" \
             --version-label "$VERSION" \
@@ -91,6 +92,7 @@ jobs:
 
       - name: Start deployment
         run: |
+          echo "Esther Test Starting deployment for environment: $EB_ENVIRONMENT"
           aws elasticbeanstalk update-environment \
             --environment-name "$EB_ENVIRONMENT" \
             --version-label "$VERSION"
